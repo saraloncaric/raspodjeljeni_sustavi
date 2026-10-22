@@ -1,24 +1,37 @@
+
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
-const KEY = 'zadaci-v1'
+const API = 'https://raspodijeljeni-sustavi-v1.onrender.com/api'
 
-function load() {
-  try {
-    return JSON.parse(localStorage.getItem(KEY)) || []
-  } catch {
-    return []
-  }
-}
-
-const tasks = ref(load())
+const tasks = ref([])
 const newText = ref('')
 const filter = ref('all')
-let nextId = tasks.value.reduce((m, t) => Math.max(m, t.id), 0) + 1
+const greska = ref('')
+const ucitavanje = ref(false)
 
-watch(tasks, (v) => {
-  try { localStorage.setItem(KEY, JSON.stringify(v)) } catch {}
-}, { deep: true })
+onMounted(() => {
+  ucitajZadatke()
+})
+
+async function ucitajZadatke() {
+  ucitavanje.value = true
+  greska.value = ''
+
+  try {
+    const odgovor = await fetch(`${API}/zadaci`)
+
+    if (!odgovor.ok) {
+      throw new Error('Greška pri dohvaćanju zadataka')
+    }
+
+    tasks.value = await odgovor.json()
+  } catch (error) {
+    greska.value = 'Nije moguće dohvatiti zadatke s poslužitelja.'
+  } finally {
+    ucitavanje.value = false
+  }
+}
 
 const visible = computed(() => {
   if (filter.value === 'open') return tasks.value.filter(t => !t.done)
@@ -34,19 +47,81 @@ const filters = [
   { id: 'done', label: 'Gotovi' }
 ]
 
-function addTask() {
+async function addTask() {
   const text = newText.value.trim()
   if (!text) return
-  tasks.value.unshift({ id: nextId++, text, done: false })
-  newText.value = ''
+
+  greska.value = ''
+
+  try {
+    const odgovor = await fetch(`${API}/zadaci`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    })
+
+    if (!odgovor.ok) {
+      throw new Error('Greška pri dodavanju zadatka')
+    }
+
+    const zadatak = await odgovor.json()
+    tasks.value.unshift(zadatak)
+    newText.value = ''
+  } catch (error) {
+    greska.value = 'Nije moguće dodati zadatak.'
+  }
 }
 
-function removeTask(id) {
-  tasks.value = tasks.value.filter(t => t.id !== id)
+async function updateTask(zadatak, done) {
+  greska.value = ''
+
+  try {
+    const odgovor = await fetch(`${API}/zadaci/${zadatak.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ done })
+    })
+
+    if (!odgovor.ok) {
+      throw new Error('Greška pri izmjeni zadatka')
+    }
+
+    const izmijenjeni = await odgovor.json()
+    const index = tasks.value.findIndex(t => t.id === zadatak.id)
+
+    if (index !== -1) {
+      tasks.value[index] = izmijenjeni
+    }
+  } catch (error) {
+    greska.value = 'Nije moguće izmijeniti zadatak.'
+    await ucitajZadatke()
+  }
 }
 
-function clearDone() {
-  tasks.value = tasks.value.filter(t => !t.done)
+async function removeTask(id) {
+  greska.value = ''
+
+  try {
+    const odgovor = await fetch(`${API}/zadaci/${id}`, {
+      method: 'DELETE'
+    })
+
+    if (!odgovor.ok) {
+      throw new Error('Greška pri brisanju zadatka')
+    }
+
+    tasks.value = tasks.value.filter(t => t.id !== id)
+  } catch (error) {
+    greska.value = 'Nije moguće obrisati zadatak.'
+  }
+}
+
+async function clearDone() {
+  const gotovi = tasks.value.filter(t => t.done)
+
+  for (const zadatak of gotovi) {
+    await removeTask(zadatak.id)
+  }
 }
 </script>
 
@@ -58,6 +133,9 @@ function clearDone() {
         {{ openCount }} {{ openCount === 1 ? 'otvoren zadatak' : 'otvorenih zadataka' }}
       </p>
     </header>
+
+    <p v-if="ucitavanje">Učitavanje zadataka...</p>
+    <p v-if="greska">{{ greska }}</p>
 
     <div class="add">
       <input
@@ -85,15 +163,25 @@ function clearDone() {
     <ul v-if="visible.length" class="list">
       <li v-for="t in visible" :key="t.id" :class="{ done: t.done }">
         <label>
-          <input v-model="t.done" type="checkbox" />
+          <input
+            type="checkbox"
+            :checked="t.done"
+            @change="updateTask(t, $event.target.checked)"
+          />
           <span>{{ t.text }}</span>
         </label>
-        <button class="remove" :aria-label="`Obriši zadatak: ${t.text}`" @click="removeTask(t.id)">
+
+        <button
+          class="remove"
+          :aria-label="`Obriši zadatak: ${t.text}`"
+          @click="removeTask(t.id)"
+        >
           Obriši
         </button>
       </li>
     </ul>
-    <p v-else class="empty">
+
+    <p v-else-if="!ucitavanje" class="empty">
       {{ tasks.length ? 'Nema zadataka u ovom filtru.' : 'Lista je prazna. Upiši prvi zadatak gore.' }}
     </p>
 
@@ -180,7 +268,9 @@ button.primary {
   padding: 0.7rem 0.9rem;
 }
 
-.list li + li { border-top: 1px solid var(--line); }
+.list li + li {
+  border-top: 1px solid var(--line);
+}
 
 .list label {
   display: flex;
@@ -197,7 +287,9 @@ button.primary {
   accent-color: var(--accent);
 }
 
-.list span { overflow-wrap: anywhere; }
+.list span {
+  overflow-wrap: anywhere;
+}
 
 .done span {
   color: var(--done);
@@ -211,14 +303,18 @@ button.primary {
   padding: 0.25rem 0.4rem;
 }
 
-.remove:hover { color: #a3322b; }
+.remove:hover {
+  color: #a3322b;
+}
 
 .empty {
   padding: 1.5rem 0;
   color: var(--muted);
 }
 
-footer { margin-top: 1rem; }
+footer {
+  margin-top: 1rem;
+}
 
 .link {
   border: none;
