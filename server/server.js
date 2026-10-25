@@ -22,6 +22,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' })
 })
 
+app.get('/', (req, res) => {
+  res.send('Pokrenut je moj server.js')
+})
+
 app.get('/api/zadaci', (req, res) => {
   const { done } = req.query
   if (done === 'true' || done === 'false') {
