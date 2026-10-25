@@ -1,11 +1,17 @@
 import express from 'express'
 import cors from 'cors'
 
-const app = express() 
+const app = express()
 const PORT = process.env.PORT || 3000
 
+const dopusteniOrigini = [
+  'https://raspodjeljeni-sustavi.onrender.com',
+  'http://localhost:5173',
+  'http://localhost:4173'
+]
+
 app.use(cors({
-  origin: 'https://raspodjeljeni-sustavi.onrender.com',
+  origin: dopusteniOrigini,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type']
 }))
@@ -86,7 +92,6 @@ app.delete('/api/zadaci/:id', (req, res) => {
   res.status(204).end()
 })
 
-// nepoznata ruta
 app.use((req, res) => {
   res.status(404).json({ greska: 'Ruta ne postoji' })
 })
