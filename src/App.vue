@@ -1,8 +1,7 @@
-
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
-const API = 'https://raspodijeljeni-sustavi-v1.onrender.com/api'
+const API = 'https://raspodjeljeni-sustavi-v1.onrender.com/api'
 
 const tasks = ref([])
 const newText = ref('')
