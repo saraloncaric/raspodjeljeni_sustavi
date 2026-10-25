@@ -5,8 +5,11 @@ const app = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors({
-  origin: 'https://raspodjeljeni-sustavi.onrender.com'
+  origin: 'https://raspodjeljeni-sustavi.onrender.com',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type']
 }))
+
 app.use(express.json())
 
 let zadaci = [
