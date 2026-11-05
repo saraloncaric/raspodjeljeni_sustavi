@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, time
 
 async def fetch_data(param):
     print(f"Nešto radim s {param}...")
@@ -7,16 +7,18 @@ async def fetch_data(param):
     return f"Rezultat za {param}"
 
 async def main():
-    task1 = asyncio.create_task(fetch_data(1))  
-    task2 = asyncio.create_task(fetch_data(2))  
- 
+    task1 = asyncio.create_task(fetch_data(1)) 
+    task2 = asyncio.create_task(fetch_data(2)) 
     result1 = await task1
     print("Fetch 1 uspješno završen.")
-    await asyncio.sleep(2)
- 
+    await asyncio.sleep(2)  
     return [result1]
 
-asyncio.run(main())
+t1 = time.perf_counter()
+results = asyncio.run(main()) 
+t2 = time.perf_counter()
+print(results)
+print(f"Vrijeme izvođenja {t2 - t1:.2f} sekunde")
 
 
 # task2 se rasporedi u event loop i počne se izvršavati čim main() prvi put preda kontrolu. Problem je što main() čeka samo task1, 
