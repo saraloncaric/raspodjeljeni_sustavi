@@ -20,5 +20,11 @@ asyncio.run(main())
 # 1. asyncio.run() pokrene event loop i main().
 # 2. create_task rasporedi tri timera, ali se još ne izvršavaju.
 # 3. await asyncio.gather(*timers) pauzira main() i event loop počne izvršavati timere.
-# 4. Svaki timer ispiše poruku i na await asyncio.sleep(1) se pauzira, a loop pokrene idući. Tako se timeri izmjenjuju svake sekunde.
-# 5. Timeri završavaju jedan po jedan (nakon 3, 5 i 7 s), a kad su svi gotovi, main() se nastavlja i završava, pa se event loop zatvara.
+# 4. Svaki timer ispiše poruku i na await asyncio.sleep(1) se pauzira, a loop pokrene idući.
+#    Tako se timeri izmjenjuju svake sekunde.
+# 5. Timeri završavaju jedan po jedan (nakon 3, 5 i 7 s), a kad su svi gotovi, main() se 
+#     nastavlja i završava, pa se event loop zatvara.
+# Stanja timera: nakon create_task je raspoređen i čeka da ga loop pokrene, kad ga loop
+# pokrene izvršava se, na await asyncio.sleep(1) je pauziran, čeka 1 s, pa je opet
+# spreman za nastavak, a nakon zadnjeg ispisa "Vrijeme je isteklo!" je završen. Cijeli 
+# program traje oko 7s, a ne 15 s, jer se timeri izvršavaju konkurentno.
