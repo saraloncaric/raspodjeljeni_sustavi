@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import prikazPodaci from './components/prikazPodaci.vue'
 
 const API = 'https://raspodjeljeni-sustavi-v1.onrender.com/api'
 
@@ -39,12 +40,23 @@ const visible = computed(() => {
 })
 
 const openCount = computed(() => tasks.value.filter(t => !t.done).length)
+const doneCount = computed(() => tasks.value.filter(t => t.done).length)
+
+const napredak = computed(() =>
+  tasks.value.length ? Math.round((doneCount.value / tasks.value.length) * 100) : 0
+)
 
 const filters = [
   { id: 'all', label: 'Svi' },
   { id: 'open', label: 'Otvoreni' },
   { id: 'done', label: 'Gotovi' }
 ]
+
+function brojZa(id) {
+  if (id === 'open') return openCount.value
+  if (id === 'done') return doneCount.value
+  return tasks.value.length
+}
 
 async function addTask() {
   const text = newText.value.trim()
@@ -125,53 +137,101 @@ async function clearDone() {
 </script>
 
 <template>
-  <main class="wrap">
-    <header>
-      <h1>Zadaci</h1>
-      <p class="count">
+  <main class="mx-auto max-w-2xl px-5 pt-12 pb-16">
+    <header class="mb-7">
+      <h1 class="text-4xl font-bold tracking-tight max-sm:text-3xl">Zadaci</h1>
+      <p class="mt-1 mb-4 text-muted">
         {{ openCount }} {{ openCount === 1 ? 'otvoren zadatak' : 'otvorenih zadataka' }}
       </p>
+
+      <template v-if="tasks.length">
+        <div
+          class="h-1.5 overflow-hidden rounded-full bg-line"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="napredak"
+        >
+          <div
+            class="h-full rounded-full bg-accent transition-all duration-300"
+            :style="{ width: napredak + '%' }"
+          ></div>
+        </div>
+        <p class="mt-1.5 text-sm text-muted">{{ doneCount }} od {{ tasks.length }} gotovo</p>
+      </template>
     </header>
 
-    <p v-if="ucitavanje">Učitavanje zadataka...</p>
-    <p v-if="greska">{{ greska }}</p>
+    <p v-if="ucitavanje" class="mb-4 text-muted">
+      Učitavanje zadataka...
+    </p>
+    <p
+      v-if="greska"
+      class="mb-4 rounded-xl border border-[#f0c9c6] bg-danger-soft px-3.5 py-3 text-danger"
+      role="alert"
+    >
+      {{ greska }}
+    </p>
 
-    <div class="add">
+    <div class="flex gap-2 max-sm:flex-col">
       <input
         v-model="newText"
         type="text"
         placeholder="Što treba napraviti?"
         aria-label="Novi zadatak"
+        class="min-w-0 flex-1 rounded-xl border border-line bg-paper px-4 py-3 shadow-card focus:border-accent focus:outline-none"
         @keyup.enter="addTask"
       />
-      <button class="primary" @click="addTask">Dodaj zadatak</button>
+      <button
+        class="rounded-xl border border-accent bg-accent px-4 py-2 text-white transition-colors hover:border-accent-dark hover:bg-accent-dark"
+        @click="addTask"
+      >
+        Dodaj zadatak
+      </button>
     </div>
 
-    <div class="filters" role="group" aria-label="Filtriraj zadatke">
+    <div class="mt-5 mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Filtriraj zadatke">
       <button
         v-for="f in filters"
         :key="f.id"
-        :class="{ active: filter === f.id }"
+        class="rounded-full border px-3.5 py-1 transition-colors"
+        :class="
+          filter === f.id
+            ? 'border-accent bg-accent-soft font-semibold text-accent'
+            : 'border-line bg-paper text-ink hover:border-accent'
+        "
         :aria-pressed="filter === f.id"
         @click="filter = f.id"
       >
         {{ f.label }}
+        <span class="ml-1.5 text-xs" :class="filter === f.id ? 'text-accent' : 'text-muted'">
+          {{ brojZa(f.id) }}
+        </span>
       </button>
     </div>
 
-    <ul v-if="visible.length" class="list">
-      <li v-for="t in visible" :key="t.id" :class="{ done: t.done }">
-        <label>
+    <ul
+      v-if="visible.length"
+      class="divide-y divide-line overflow-hidden rounded-xl border border-line bg-paper shadow-card"
+    >
+      <li
+        v-for="t in visible"
+        :key="t.id"
+        class="flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[#f7f9fb]"
+      >
+        <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
           <input
             type="checkbox"
+            class="size-5 accent-accent"
             :checked="t.done"
             @change="updateTask(t, $event.target.checked)"
           />
-          <span>{{ t.text }}</span>
+          <span class="break-words" :class="t.done ? 'text-done line-through' : ''">
+            {{ t.text }}
+          </span>
         </label>
 
         <button
-          class="remove"
+          class="rounded-md px-2.5 py-1 text-muted transition-colors hover:bg-danger-soft hover:text-danger"
           :aria-label="`Obriši zadatak: ${t.text}`"
           @click="removeTask(t.id)"
         >
@@ -180,146 +240,17 @@ async function clearDone() {
       </li>
     </ul>
 
-    <p v-else-if="!ucitavanje" class="empty">
+    <p
+      v-else-if="!ucitavanje"
+      class="rounded-xl border border-dashed border-line bg-paper px-4 py-10 text-center text-muted"
+    >
       {{ tasks.length ? 'Nema zadataka u ovom filtru.' : 'Lista je prazna. Upiši prvi zadatak gore.' }}
     </p>
 
-    <footer v-if="tasks.some(t => t.done)">
-      <button class="link" @click="clearDone">Ukloni gotove zadatke</button>
+    <footer v-if="tasks.some(t => t.done)" class="mt-4 text-right">
+      <button class="text-accent underline" @click="clearDone">Ukloni gotove zadatke</button>
     </footer>
+
+    <PrikazPodaci />
   </main>
 </template>
-
-<style scoped>
-.wrap {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 3rem 1.25rem 4rem;
-}
-
-h1 {
-  margin: 0;
-  font-size: 2.25rem;
-  letter-spacing: -0.02em;
-}
-
-.count {
-  margin: 0.25rem 0 1.75rem;
-  color: var(--muted);
-}
-
-.add {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.add input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.65rem 0.8rem;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--paper);
-  color: var(--ink);
-}
-
-button {
-  cursor: pointer;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 0.5rem 0.9rem;
-}
-
-button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.filters {
-  display: flex;
-  gap: 0.4rem;
-  margin: 1.25rem 0 0.75rem;
-}
-
-.filters button.active {
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-
-.list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.7rem 0.9rem;
-}
-
-.list li + li {
-  border-top: 1px solid var(--line);
-}
-
-.list label {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.list input[type='checkbox'] {
-  width: 1.1rem;
-  height: 1.1rem;
-  accent-color: var(--accent);
-}
-
-.list span {
-  overflow-wrap: anywhere;
-}
-
-.done span {
-  color: var(--done);
-  text-decoration: line-through;
-}
-
-.remove {
-  border: none;
-  background: none;
-  color: var(--muted);
-  padding: 0.25rem 0.4rem;
-}
-
-.remove:hover {
-  color: #a3322b;
-}
-
-.empty {
-  padding: 1.5rem 0;
-  color: var(--muted);
-}
-
-footer {
-  margin-top: 1rem;
-}
-
-.link {
-  border: none;
-  background: none;
-  padding: 0;
-  color: var(--accent);
-  text-decoration: underline;
-}
-</style>
